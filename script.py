@@ -33,7 +33,7 @@ def main(input_filename="ates.jpg", out_filename="process_output.png", output_sc
 		print(f"Error: failed to read image '{input_filename}'")
 		sys.exit(1)
 
-	# Blurred (color) for display and blurred grayscale for thresholding
+	# Blurred (color) for display and blurred grayscale for thresholding afsdfdas
 	blur_color = cv2.GaussianBlur(image, (35, 35), 0)
 	gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 	gray_blur = cv2.GaussianBlur(gray, (35, 35), 0)
