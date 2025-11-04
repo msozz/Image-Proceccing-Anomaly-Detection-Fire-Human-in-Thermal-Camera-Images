@@ -1,5 +1,3 @@
-import os
-import sys
 import cv2
 import numpy as np
 
@@ -21,17 +19,14 @@ def ensure_bgr(img):
 	return img
 
 
-def main(input_filename="ates.jpg", out_filename="process_output.png", output_scale=1.5, show_gui=True):
+def main(input_filename="ates3.jpg", show_gui=True):
 	# startup info removed per user request (no printed library explanations)
 
-	if not os.path.isfile(input_filename):
-		print(f"Error: input file '{input_filename}' not found in {os.getcwd()}")
-		sys.exit(1)
-
+	# attempt to read image; if it fails, print error and return
 	image = cv2.imread(input_filename)
 	if image is None:
 		print(f"Error: failed to read image '{input_filename}'")
-		sys.exit(1)
+		return
 
 	# Blurred (color) for display and blurred grayscale for thresholding
 	blur_color = cv2.GaussianBlur(image, (35, 35), 0)
@@ -39,7 +34,7 @@ def main(input_filename="ates.jpg", out_filename="process_output.png", output_sc
 	gray_blur = cv2.GaussianBlur(gray, (35, 35), 0)
 
 	# Thresholds (use gray inputs). If you want Otsu, change thresh value to 0 and add +cv2.THRESH_OTSU
-	th_blur = cv2.threshold(gray_blur, 220, 255, cv2.THRESH_BINARY)[1]
+	th_blur = cv2.threshold(gray_blur, 180, 255, cv2.THRESH_BINARY)[1]
 
 	# Prepare images for side-by-side display: all must be BGR and same size
 	h, w = image.shape[:2]
@@ -83,22 +78,10 @@ def main(input_filename="ates.jpg", out_filename="process_output.png", output_sc
 	# Draw detection boxes and label on the fire panel only
 	for (x, y, bw, bh) in boxes:
 		cv2.rectangle(display_fire, (x, y), (x + bw, y + bh), (0, 0, 255), 2)
-		cv2.putText(display_fire, "FIRE", (x, max(y - 6, 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2, cv2.LINE_AA)
+		cv2.putText(display_fire, "FIRE or Human", (x, max(y - 6, 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2, cv2.LINE_AA)
 
 	# Print a short summary to console
 	print(f"[Detection] bright pixels: {white_count} / {total_pixels} ({white_ratio:.4%}), fire={is_fire}")
-
-	# Optionally resize if images are too large for display (keep reasonable width)
-	max_width = 1600
-	scale = 1.0
-	if 4 * w > max_width:
-		scale = max_width / (4 * w)
-		new_w = int(w * scale)
-		new_h = int(h * scale)
-		display_orig = cv2.resize(display_orig, (new_w, new_h), interpolation=cv2.INTER_AREA)
-		display_blur = cv2.resize(display_blur, (new_w, new_h), interpolation=cv2.INTER_AREA)
-		display_th = cv2.resize(display_th, (new_w, new_h), interpolation=cv2.INTER_AREA)
-		display_fire = cv2.resize(display_fire, (new_w, new_h), interpolation=cv2.INTER_AREA)
 
 	# Add labels
 	add_label(display_orig, "Original")
@@ -120,4 +103,3 @@ def main(input_filename="ates.jpg", out_filename="process_output.png", output_sc
 
 if __name__ == "__main__":
 	main()
-
