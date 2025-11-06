@@ -2,103 +2,63 @@ import cv2
 import numpy as np
 
 
-def add_label(img, text, font_scale=1.0, thickness=2, margin=8):
-	color = (255, 255, 255)
-	outline = (0, 0, 0)
-	org = (margin, 30)
-	cv2.putText(img, text, org, cv2.FONT_HERSHEY_SIMPLEX, font_scale, outline, thickness + 2, cv2.LINE_AA)
-	cv2.putText(img, text, org, cv2.FONT_HERSHEY_SIMPLEX, font_scale, color, thickness, cv2.LINE_AA)
+def add_label(img, text):
+	cv2.putText(img, text, (8, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 0), 4, cv2.LINE_AA)
+	cv2.putText(img, text, (8, 30), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 2, cv2.LINE_AA)
 
 
-def ensure_bgr(img):
-	"""Return a 3-channel BGR image. If input is single-channel, convert to BGR."""
-	if img is None:
-		return None
-	if len(img.shape) == 2:
-		return cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-	return img
-
-
-def main(input_filename="ates3.jpg", show_gui=True):
-	# startup info removed per user request (no printed library explanations)
-
-	# attempt to read image; if it fails, print error and return
+def main(input_filename="ates2.jpg"):
 	image = cv2.imread(input_filename)
 	if image is None:
 		print(f"Error: failed to read image '{input_filename}'")
 		return
 
-	# Blurred (color) for display and blurred grayscale for thresholding
-	blur_color = cv2.GaussianBlur(image, (35, 35), 0)
-	gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-	gray_blur = cv2.GaussianBlur(gray, (35, 35), 0)
+	# Gaussian blur and threshold
+	gray_blur = cv2.GaussianBlur(cv2.cvtColor(image, cv2.COLOR_BGR2GRAY), (35, 35), 0)
+	_, th = cv2.threshold(gray_blur, 180, 255, cv2.THRESH_BINARY)
+	
+	# Morphological opening to clean noise
+	mask = cv2.morphologyEx(th, cv2.MORPH_OPEN, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)))
 
-	# Thresholds (use gray inputs). If you want Otsu, change thresh value to 0 and add +cv2.THRESH_OTSU
-	th_blur = cv2.threshold(gray_blur, 180, 255, cv2.THRESH_BINARY)[1]
-
-	# Prepare images for side-by-side display: all must be BGR and same size
-	h, w = image.shape[:2]
-	display_orig = ensure_bgr(image.copy())
-	display_blur = ensure_bgr(blur_color.copy())
-	display_th = ensure_bgr(th_blur.copy())
-
-	# --- Fire detection on the threshold result (th_blur) ---
-	# Clean small noise with a morphological open, then count bright pixels
-	kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
-	mask = cv2.morphologyEx(th_blur, cv2.MORPH_OPEN, kernel)
-	white_count = int(cv2.countNonZero(mask))
-	total_pixels = mask.shape[0] * mask.shape[1]
-	white_ratio = white_count / total_pixels
-
-	# Heuristic: if more than threshold_ratio of pixels are bright, flag as fire
-	# You can tune detection_threshold to be more/less sensitive
-	detection_threshold = 0.005  # 0.5% of image area by default
-	is_fire = white_ratio >= detection_threshold
-
-	# Find contours (blobs) of bright areas to optionally draw boxes
+	# Find and filter contours
 	contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-	min_blob_area = 200  # ignore tiny blobs
 	boxes = []
 	for cnt in contours:
 		area = cv2.contourArea(cnt)
-		if area >= min_blob_area:
-			x, y, bw, bh = cv2.boundingRect(cnt)
-			boxes.append((x, y, bw, bh))
+		if area < 200:
+			continue
+		x, y, w, h = cv2.boundingRect(cnt)
+		boxes.append((x, y, w, h))
 
-	# Do not draw boxes on the original image (user requested). We'll draw on the fire panel instead.
-
-	# Also visualize the cleaned mask in the threshold display (convert to BGR)
-	display_th = ensure_bgr(mask)
-
-	# Create a fire-visualization panel: overlay mask in red on the original
-	colored_mask = np.zeros_like(display_orig)
-	colored_mask[mask == 255] = (0, 0, 255)  # red overlay for fire regions (BGR)
-	display_fire = cv2.addWeighted(display_orig, 0.7, colored_mask, 0.3, 0)
-
-	# Draw detection boxes and label on the fire panel only
-	for (x, y, bw, bh) in boxes:
-		cv2.rectangle(display_fire, (x, y), (x + bw, y + bh), (0, 0, 255), 2)
-		cv2.putText(display_fire, "FIRE or Human", (x, max(y - 6, 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2, cv2.LINE_AA)
-
-	# Print a short summary to console
-	print(f"[Detection] bright pixels: {white_count} / {total_pixels} ({white_ratio:.4%}), fire={is_fire}")
+	# Create visualization panels
+	display_blur = cv2.cvtColor(gray_blur, cv2.COLOR_GRAY2BGR)
+	display_th = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGR)
+	
+	# Contour visualization
+	display_contour = np.zeros_like(image)
+	cv2.drawContours(display_contour, contours, -1, (0, 255, 0), 2)
+	for x, y, w, h in boxes:
+		cv2.rectangle(display_contour, (x, y), (x + w, y + h), (255, 0, 0), 1)
+	
+	# Detection visualization
+	display_fire = image.copy()
+	for x, y, w, h in boxes:
+		cv2.rectangle(display_fire, (x, y), (x + w, y + h), (0, 0, 255), 2)
+		cv2.putText(display_fire, "FIRE", (x, max(y - 6, 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2, cv2.LINE_AA)
 
 	# Add labels
-	add_label(display_orig, "Original")
-	add_label(display_blur, "Blurred")
+	add_label(image, "Original")
+	add_label(display_blur, "Gaussian Blur")
 	add_label(display_th, "Threshold")
-	add_label(display_fire, "Detected Fire")
+	add_label(display_contour, "Contours")
+	add_label(display_fire, "Detected")
 
-	# Concatenate horizontally: Original | Blurred | Threshold | Fire
-	combined = np.hstack([display_orig, display_blur, display_th, display_fire])
-
-	# Show the combined image in a single window unless disabled
-	if show_gui:
-		cv2.namedWindow("Process: Original | Blurred | Threshold | Fire", cv2.WINDOW_NORMAL)
-		cv2.imshow("Process: Original | Blurred | Threshold | Fire", combined)
-		print("Press any key in the image window to exit.")
-		cv2.waitKey(0)
-		cv2.destroyAllWindows()
+	# Show combined output
+	combined = np.hstack([image, display_blur, display_th, display_contour, display_fire])
+	cv2.namedWindow("Process", cv2.WINDOW_NORMAL)
+	cv2.imshow("Process", combined)
+	cv2.waitKey(0)
+	cv2.destroyAllWindows()
 
 
 if __name__ == "__main__":
