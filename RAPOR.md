@@ -480,5 +480,3 @@ Bu proje, termal kamera görüntülerinde nesne tespiti yapan bir sistemi **karm
 
 **Son Güncellenme**: 7 Kasım 2025
 **Proje Durumu**: ✅ Aktif ve Optimal
-**Sonraki Adım**: Derin öğrenme modelleri ile hibrit sistem oluşturma
-
